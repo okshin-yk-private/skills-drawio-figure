@@ -111,6 +111,47 @@ arrow-1          → Connection arrow
 </mxCell>
 ```
 
+### ECS Service Group
+
+Place inside a Private Subnet. Uses a solid orange border container with a small ECS Service
+icon placed as a child cell in the top-left corner (mimicking a group icon marker).
+
+```xml
+<!-- ECS Service container group -->
+<mxCell id="ecs-svc-1a" value="ECS Service" style="fillColor=none;strokeColor=#ED7100;dashed=0;fontColor=#ED7100;fontStyle=1;fontSize=11;verticalAlign=top;align=left;spacingLeft=30;html=1;whiteSpace=wrap;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;" vertex="1" parent="subnet-priv-app-1a">
+  <mxGeometry x="15" y="35" width="510" height="100" as="geometry" />
+</mxCell>
+
+<!-- ECS Service icon marker (top-left corner of the group) -->
+<mxCell id="ecs-svc-icon-1a" value="" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.ecs_service;" vertex="1" parent="ecs-svc-1a">
+  <mxGeometry x="5" y="5" width="24" height="24" as="geometry" />
+</mxCell>
+```
+
+### ECS Task Icon (inside ECS Service Group)
+
+The ECS Task is the actual communication endpoint. **All arrows (incoming from ALB, outgoing
+to databases, etc.) MUST connect to the ECS Task icon.**
+
+```xml
+<mxCell id="task-1a" value="ECS Task" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.ecs_task;" vertex="1" parent="ecs-svc-1a">
+  <mxGeometry x="60" y="35" width="48" height="48" as="geometry" />
+</mxCell>
+```
+
+### Fargate Icon (inside ECS Service Group)
+
+When using the Fargate launch type, place the Fargate icon inside the ECS Service group.
+**Position it away from the ECS Task icon (e.g., right side of the group) so it does not
+overlap with communication arrow paths.** The Fargate icon is a launch-type indicator —
+never connect arrows to/from it.
+
+```xml
+<mxCell id="fargate-1a" value="AWS Fargate" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F78E04;gradientDirection=north;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fargate;" vertex="1" parent="ecs-svc-1a">
+  <mxGeometry x="420" y="25" width="48" height="48" as="geometry" />
+</mxCell>
+```
+
 ### Corporate Data Center Group
 
 ```xml
@@ -191,6 +232,38 @@ The key properties per category:
   <mxGeometry relative="1" as="geometry" />
 </mxCell>
 ```
+
+### Arrow with Exit/Entry Constraints (routing around obstacles)
+
+draw.io's `orthogonalEdgeStyle` does NOT automatically avoid icons in the path.
+When an arrow would cross through a non-communication icon (e.g., NAT Gateway in a
+Public Subnet), add **exit/entry constraints** to the edge style to force the routing direction.
+
+| Property | Value | Effect |
+|----------|-------|--------|
+| `exitX`  | 0–1   | Horizontal position on source (0=left, 0.5=center, 1=right) |
+| `exitY`  | 0–1   | Vertical position on source (0=top, 0.5=middle, 1=bottom) |
+| `entryX` | 0–1   | Horizontal position on target |
+| `entryY` | 0–1   | Vertical position on target |
+| `exitDx` / `exitDy` | 0 | Pixel offset (normally 0) |
+| `entryDx` / `entryDy` | 0 | Pixel offset (normally 0) |
+
+**Common pattern — top-to-bottom routing (bypass Public Subnet level):**
+
+```xml
+<!-- ALB → ECS Task: exit bottom, enter top → routes below Public Subnet -->
+<mxCell id="arrow-5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;
+  strokeColor=#232F3E;strokeWidth=1;endArrow=block;endFill=1;fontSize=11;
+  exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
+  edge="1" source="alb" target="task-1a" parent="1">
+  <mxGeometry relative="1" as="geometry" />
+</mxCell>
+```
+
+**Route produced:** ALB bottom → straight down → horizontal turn → ECS Task top.
+This bypasses any icons (NAT Gateway, etc.) in the Public Subnet at the ALB's y-level.
+Unlike waypoints, exit/entry constraints do not require absolute coordinate calculations
+and work correctly regardless of layout changes.
 
 ## Numbered Callouts
 

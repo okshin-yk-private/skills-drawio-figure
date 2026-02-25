@@ -13,10 +13,10 @@ standards-compliant `.drawio` XML file using official AWS Architecture Icons (mx
 
 ## Before You Begin
 
-1. Read `references/icon-mapping.md` — Terraform resource type → draw.io shape mapping
-2. Read `references/group-hierarchy.md` — Group nesting rules, colors, and draw.io XML patterns
-3. Read `references/placement-rules.md` — Which AWS resources belong inside which groups
-4. Read `references/drawio-xml-patterns.md` — XML templates for generating valid draw.io files
+1. Read `../shared-references/icon-mapping.md` — Terraform resource type → draw.io shape mapping
+2. Read `../shared-references/group-hierarchy.md` — Group nesting rules, colors, and draw.io XML patterns
+3. Read `../shared-references/placement-rules.md` — Which AWS resources belong inside which groups
+4. Read `../shared-references/drawio-xml-patterns.md` — XML templates for generating valid draw.io files
 
 ## Workflow
 
@@ -79,7 +79,7 @@ AWS Cloud
        └── [VPC-external regional services: S3, DynamoDB, CloudFront, Route 53, etc.]
 ```
 
-**Decision rules for placement — consult `references/placement-rules.md` for the full list:**
+**Decision rules for placement — consult `../shared-references/placement-rules.md` for the full list:**
 
 - If a resource has `subnet_id` or `subnet_ids` → place inside the corresponding Subnet group
 - If a resource has `vpc_id` but no subnet → place inside VPC but outside any Subnet
@@ -185,7 +185,7 @@ After all icons are placed, run a validation pass:
 
 ### Step 4: Generate Draw.io XML
 
-Use the templates in `references/drawio-xml-patterns.md` to assemble the XML.
+Use the templates in `../shared-references/drawio-xml-patterns.md` to assemble the XML.
 
 **Key principles:**
 

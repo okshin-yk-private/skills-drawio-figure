@@ -17,7 +17,9 @@ AWS Cloud                    (outermost)
        │         │    ├── Public Subnet
        │         │    │    └── resources / Security Group
        │         │    └── Private Subnet
-       │         │         └── resources / Security Group
+       │         │         ├── resources / Security Group
+       │         │         └── ECS Service group
+       │         │              └── Fargate tasks (icons)
        │         └── Auto Scaling group (may span AZs)
        │              └── EC2 instances
        └── [Regional services outside VPC]
@@ -171,6 +173,32 @@ fillColor=none;strokeColor=#DD344C;dashed=0;fontColor=#DD344C;fontStyle=1;vertic
 ```
 shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_auto_scaling_group;strokeColor=#ED7100;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#ED7100;dashed=1;dashPattern=5 5;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;
 ```
+
+### ECS Service Group
+
+A container group for ECS tasks running inside a Private Subnet.
+
+| Property      | Value                          |
+|---------------|--------------------------------|
+| strokeColor   | #ED7100                        |
+| fillColor     | none                           |
+| dashPattern   | solid                          |
+| grIcon        | (none — see Icon Marker below) |
+| fontColor     | #ED7100                        |
+
+**draw.io style:**
+```
+fillColor=none;strokeColor=#ED7100;dashed=0;fontColor=#ED7100;fontStyle=1;fontSize=11;verticalAlign=top;align=left;spacingLeft=30;html=1;whiteSpace=wrap;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;
+```
+
+**Icon Marker:** `mxgraph.aws4.group_ecs_service` does NOT exist as a valid grIcon. Instead, place a
+small (24x24) ECS Service icon (`shape=mxgraph.aws4.ecs_service`) as a child cell at the top-left
+corner of the container (x=5, y=5). This mimics the group icon behavior seen in official AWS diagrams.
+
+**Nesting:** Place inside a Private Subnet. Contains:
+- An ECS Service icon marker (24x24, top-left corner, no label)
+- ECS Task icons (`shape=mxgraph.aws4.ecs_task`)
+- AWS Fargate icon (`resIcon=mxgraph.aws4.fargate`) when using Fargate launch type
 
 ### EC2 Instance Contents
 

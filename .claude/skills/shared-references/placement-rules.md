@@ -154,14 +154,65 @@ at the top edge or left edge of the VPC group where external traffic enters.
 
 ### NAT Gateway
 Place inside the **Public Subnet** where it is deployed (NAT gateways require a public subnet and EIP).
+NAT Gateways handle **outbound** traffic only (private subnet → internet). They are NOT part of
+the inbound communication path.
+
+**Arrow exit/entry constraints (required):** draw.io's `orthogonalEdgeStyle` does NOT automatically
+avoid obstacles. When an inbound arrow (e.g., ALB → ECS Task) would cross through a Public Subnet
+at the same y-level as the NAT Gateway, add **exit/entry constraints** to the arrow style to force
+the routing direction:
+
+```
+exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;
+```
+
+- `exitX=0.5;exitY=1` — arrow exits from the **bottom center** of the source (e.g., ALB)
+- `entryX=0.5;entryY=0` — arrow enters from the **top center** of the target (e.g., ECS Task)
+
+This forces the route: source bottom → straight down → horizontal turn → target top, which
+bypasses the Public Subnet y-level entirely. With this constraint, NAT Gateway can be placed
+at any x-position within the Public Subnet (center is preferred for visual balance).
+
+See `drawio-xml-patterns.md` > "Arrow with Exit/Entry Constraints" for the XML template.
 
 ### Load Balancers (ALB/NLB)
-Place inside the **VPC**, spanning across Availability Zones if `subnets` are in multiple AZs.
-For diagrams, place in the subnet(s) where they have ENIs, or at the VPC level if spanning AZs.
+ALB/NLB creates ENIs in each subnet listed in the `subnets` attribute.
+
+- **Multiple AZs (typical):** Place a single ALB/NLB icon at the **VPC level** (`parent="vpc-main"`),
+  positioned so that its **y-coordinate aligns with the Public Subnet icons** (e.g., NAT Gateway)
+  it is deployed in. This means calculating the absolute y position of the subnet content within
+  the VPC and placing ALB at the same y level. The ALB should visually sit between the two AZ
+  groups, spanning across AZ boundaries. Do NOT place inside individual subnets when the LB
+  spans multiple AZs.
+- **Single AZ:** Place inside the specific subnet where the LB has its ENI.
 
 ### ECS/EKS with Fargate
-- ECS Service with `network_configuration` → place tasks in the specified subnets
-- EKS control plane is a regional managed service; worker nodes go in subnets
+
+When `aws_ecs_service` has `network_configuration { subnets }`, draw the following hierarchy:
+
+1. **ECS Service group** — Place an ECS Service container group (`parent` = the Private Subnet)
+   inside each specified Private Subnet (one per AZ). This is a draw.io container using
+   a **solid orange border** (see `drawio-xml-patterns.md` > ECS Service Group).
+2. **ECS Service icon marker** — Place a small (24x24) ECS Service icon
+   (`shape=mxgraph.aws4.ecs_service`) as a child cell at the top-left corner (x=5, y=5)
+   of the ECS Service group. This acts as a group icon marker. Set `value=""` (no label).
+3. **ECS Task icons** — Place ECS Task icons (`shape=mxgraph.aws4.ecs_task`) inside the
+   ECS Service group. **All communication arrows (incoming and outgoing) MUST connect to
+   the ECS Task icon**, as the task is the actual communication endpoint.
+4. **Fargate icon** — When using the Fargate launch type, place an AWS Fargate icon
+   (`resIcon=mxgraph.aws4.fargate`) inside each ECS Service group. Position it away from
+   the ECS Task icon (e.g., right side of the group) so it does not overlap with
+   communication arrow paths. The Fargate icon is a launch-type indicator, NOT a
+   communication target — never connect arrows to/from it.
+5. **Auto Scaling** — If `aws_appautoscaling_target` / `aws_appautoscaling_policy` targets
+   the ECS service, place an Application Auto Scaling icon near the ECS Service group.
+
+**Note:** Do NOT place a separate ECS cluster icon at the Region level. The ECS Service
+group within the subnet already represents the ECS deployment. The `aws_ecs_cluster`
+resource is a management-plane construct and does not need a standalone icon in the diagram.
+
+- EKS control plane is a regional managed service (place at Region level); worker nodes
+  (including Fargate pods) go in the subnets specified by the node group or Fargate profile.
 
 ### RDS Multi-AZ
 Place in the primary AZ's subnet, with an arrow/notation indicating Multi-AZ standby.
