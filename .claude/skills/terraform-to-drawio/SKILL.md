@@ -230,85 +230,222 @@ Before writing the file:
 ### Step 5.5: Visual Verification (Optional)
 
 After writing the `.drawio` file, perform a visual verification loop using the drawio MCP
-and Playwright MCP tools. This step catches layout issues that structural validation (Step 5)
-cannot detect: icon overlap, arrow-icon intersection, label truncation, and overall readability.
+and Chrome headless screenshot. This step catches layout issues that structural validation
+(Step 5) cannot detect: icon overlap, arrow-icon intersection, label truncation, and
+overall readability.
 
 **Prerequisites:**
-- drawio MCP server is configured (`mcp__drawio__open_drawio_xml` available)
-- Playwright MCP server is configured (`@playwright/mcp` in `.mcp.json`)
+- `google-chrome` or `chromium` is available on the system
+- For the primary method (Step 1-2b): drawio MCP server is configured (`mcp__drawio__open_drawio_xml` available)
+- For the HTML fallback (Step 2c): `node` is available and internet access for CDN
+
+**IMPORTANT — Why Chrome headless instead of Playwright:**
+draw.io MCP generates `#create=` URLs with compressed, Base64-encoded, percent-encoded XML
+in the hash fragment. Playwright's `page.goto()` normalizes URLs via Node.js's `URL()`
+constructor (WHATWG URL Standard), which decodes percent-encoded characters in the hash
+fragment (`%2B` → `+`, `%2F` → `/`, etc.), corrupting the Base64 data and causing `atob()`
+failures. Chrome's headless `--screenshot` mode bypasses this entirely by passing the URL
+directly to the Chromium engine without JavaScript URL normalization.
 
 **Verification flow:**
 
 1. **Open in lightbox mode**: Call `mcp__drawio__open_drawio_xml` with the generated XML
    content and `lightbox=true`. Extract the URL from the response.
 
-2. **Launch Playwright agent**: Use the Task tool to launch a `playwright-test-planner` agent
-   with the following instructions:
+2. **Save URL and take screenshot**: The URL from drawio MCP is very long (3000+ chars).
+   Save it to a temporary file to avoid shell quoting issues, then use Chrome headless.
 
+   **Step 2a — Detect Chrome binary and temp directory:**
+
+   Run the appropriate detection command for the current platform:
+
+   ```bash
+   # Detect platform and Chrome binary
+   case "$(uname -s)" in
+     Linux*)
+       CHROME=$(which google-chrome || which chromium || which chromium-browser || which google-chrome-stable || echo "")
+       TMPDIR_PATH="/tmp"
+       SANDBOX_FLAG="--no-sandbox"
+       ;;
+     Darwin*)
+       CHROME=$(which google-chrome 2>/dev/null || echo "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+       TMPDIR_PATH="${TMPDIR:-/tmp}"
+       SANDBOX_FLAG=""
+       ;;
+   esac
+   echo "Chrome: $CHROME"
    ```
-   Task(
-     subagent_type="playwright-test-planner",
-     description="Screenshot drawio diagram for visual verification",
-     prompt="
-       1. Navigate to this URL: {url_from_step_1}
-       2. Wait for the diagram to fully render:
-          - Use browser_wait_for to wait for the SVG canvas to appear
-            (wait for 'svg' element or '.geDiagramContainer' to be visible)
-          - Wait an additional 2 seconds for icon rendering to complete
-       3. Take a full-page screenshot using browser_take_screenshot
-       4. Use browser_evaluate to extract element position data:
-          - Run JavaScript to find all SVG <g> elements with 'data-cell-id' attributes
-          - For each element, extract: cell-id, transform (x, y), bounding box (width, height)
-          - Return as JSON array
-       5. Report back:
-          - The screenshot file path
-          - The position data JSON
-          - Any rendering errors visible in the console (use browser_console_messages)
-     "
-   )
+
+   On **Windows** (Git Bash / WSL), the Chrome binary is typically at:
+   `"/c/Program Files/Google/Chrome/Application/chrome.exe"` (Git Bash) or
+   `/mnt/c/Program\ Files/Google/Chrome/Application/chrome.exe` (WSL).
+
+   If no Chrome binary is found, skip visual verification.
+
+   **Step 2b — Save URL and take screenshot:**
+
+   ```bash
+   # Save the full URL to a file (use heredoc to avoid shell interpretation)
+   cat << 'URLEOF' > "$TMPDIR_PATH/drawio-url.txt"
+   {url_from_step_1}
+   URLEOF
+
+   # Take screenshot with Chrome headless
+   URL=$(cat "$TMPDIR_PATH/drawio-url.txt" | tr -d '\n')
+   "$CHROME" --headless=new --disable-gpu $SANDBOX_FLAG \
+     --screenshot=/path/to/output/diagram-verify.png \
+     --window-size=1920,1200 \
+     --virtual-time-budget=20000 \
+     "$URL"
    ```
+
+   **Key parameters:**
+   - `--headless=new`: Use Chrome's new headless mode (required for modern Chrome)
+   - `--virtual-time-budget=20000`: Allow 20 seconds of virtual time for draw.io to
+     fully load and render all AWS icons (increase to 30000 for complex diagrams)
+   - `--window-size=1920,1200`: Wide viewport to capture the full diagram
+   - `--no-sandbox`: Linux only, required in some CI/container environments (omit on macOS/Windows)
+   - `--disable-gpu`: Recommended for headless mode on all platforms
+
+   **Step 2c — HTML viewer fallback (if MCP URL fails):**
+
+   The MCP `#create=` URL contains compressed, Base64-encoded, percent-encoded XML.
+   This multi-layer encoding is fragile — Chrome may still produce zlib decompression
+   errors (`"invalid code lengths set"`) or Base64 decode errors (`"atob()"` failures)
+   even in headless mode. If the screenshot from Step 2b shows an error dialog (C4),
+   **skip the MCP URL entirely** and use this fallback:
+
+   ```bash
+   # 1. Strip XML comments from the .drawio file (comments can contain problematic chars)
+   sed '/<!--/d' /path/to/diagram.drawio | sed '/^$/d' > "$TMPDIR_PATH/drawio-clean.xml"
+
+   # 2. Create a self-contained HTML file with draw.io viewer
+   node -e "
+   const fs = require('fs');
+   const xml = fs.readFileSync('$TMPDIR_PATH/drawio-clean.xml', 'utf8');
+   const data = JSON.stringify({
+     highlight: '#0000ff', nav: false, resize: true,
+     toolbar: '', edit: '_blank', xml: xml
+   });
+   const escaped = data
+     .replace(/&/g, '&amp;')
+     .replace(/\"/g, '&quot;')
+     .replace(/</g, '&lt;')
+     .replace(/>/g, '&gt;');
+   const html = \`<!DOCTYPE html>
+   <html><head><meta charset=\"utf-8\">
+   <style>body{margin:0;padding:20px;background:white}</style></head>
+   <body>
+   <div class=\"mxgraph\" style=\"max-width:100%;border:none;\"
+        data-mxgraph=\"\${escaped}\"></div>
+   <script src=\"https://viewer.diagrams.net/js/viewer-static.min.js\"></script>
+   </body></html>\`;
+   fs.writeFileSync('$TMPDIR_PATH/drawio-viewer.html', html);
+   "
+
+   # 3. Take screenshot (file:// URL — no encoding issues)
+   "$CHROME" --headless=new --disable-gpu $SANDBOX_FLAG \
+     --screenshot=/path/to/output/diagram-verify.png \
+     --window-size=1920,1400 \
+     --virtual-time-budget=30000 \
+     "file://$TMPDIR_PATH/drawio-viewer.html"
+   ```
+
+   **Why this works:** The XML is embedded as a JSON string inside an HTML attribute.
+   No URL percent-encoding, no Base64, no zlib compression — the draw.io viewer JS
+   (`viewer-static.min.js`) receives the raw XML directly from the DOM.
+
+   **Requirements:**
+   - `node` must be available (for JSON escaping of XML with special characters)
+   - Internet access is needed to load `viewer-static.min.js` from the CDN
+   - Use `--virtual-time-budget=30000` (higher than MCP URL) because the viewer JS
+     must first download from CDN before rendering
+
+   **When to use this fallback:**
+   - Screenshot shows error dialog: "ファイル読み込みエラー", "invalid code lengths set",
+     "invalid literal", or any other data corruption message
+   - The MCP URL is extremely long (>4000 chars) and may be truncated by the shell
+   - drawio MCP is not available but Chrome is
 
 3. **Analyze results**: Read the screenshot using the Read tool (supports images).
-   Check for these visual issues:
+   Perform the following checks **in order** (Critical → Important → Minor).
+   Compare the screenshot against the Terraform source and the generated XML to verify
+   correctness.
 
-   | Check | What to look for |
-   |-------|-----------------|
-   | Icon overlap | Two or more icons visually overlapping |
-   | Arrow-icon intersection | An arrow passing through an unrelated icon |
-   | Label truncation | Labels cut off or overlapping other elements |
-   | Group containment | Icons visually outside their parent group boundary |
-   | Overall flow clarity | Primary traffic flow should be visually obvious (top-to-bottom or left-to-right) |
-   | Empty regions | Large empty spaces that could be compacted |
+   **Critical checks (must fix before presenting to user):**
 
-4. **Fix and iterate**: If issues are found:
-   a. Identify the specific resources/groups with problems
-   b. Adjust the XML geometry (x, y, width, height) values
-   c. Re-write the `.drawio` file
-   d. Repeat from step 1 (maximum **2 iterations**)
+   | # | Check | What to look for | How to verify |
+   |---|-------|-----------------|---------------|
+   | C1 | Network topology accuracy | Arrows (connections) must reflect the actual data flow defined in Terraform. Verify: (a) every arrow connects the correct source/target pair, (b) no arrow exists that has no corresponding Terraform relationship, (c) no expected connection is missing. | Cross-reference each arrow's `source` and `target` cell IDs against the Terraform dependency graph from Step 1. |
+   | C2 | Icon overlap | Two or more icons must not visually overlap. Each icon should have clear spacing (minimum 20px visual gap). | Scan the screenshot for any stacked or overlapping icons. Pay special attention to dense areas like subnets with multiple services. |
+   | C3 | Label text errors | Service names and labels must match the actual AWS service names and Terraform resource names. Check for: typos, wrong service names (e.g., "Amazon RDS" labeled as "Amazon Aurora"), truncated names, garbled characters, HTML entities showing as raw text (e.g., `&lt;br&gt;` instead of line break). | Compare every visible label in the screenshot against the `value` attribute of the corresponding mxCell in the XML. |
+   | C4 | Error dialogs | If a modal error dialog is visible (e.g., "File load error", "invalid literal"), the screenshot is unusable. | Look for any modal overlay in the center of the screenshot. |
 
-5. **Skip conditions**: Skip this step if:
+   **Important checks (should fix if possible):**
+
+   | # | Check | What to look for | How to verify |
+   |---|-------|-----------------|---------------|
+   | I1 | Group containment | Every resource icon must be visually inside its correct parent group. E.g., EC2 instances inside their Subnet, Subnets inside their AZ, AZs inside VPC. Resources that should be outside VPC (S3, CloudFront, SNS, etc.) must not appear inside VPC. | Compare the visual position of each icon against the group hierarchy defined in Step 2 (placement rules). |
+   | I2 | Arrow direction | Arrows must flow in the correct direction reflecting data/request flow (typically top-to-bottom: Users → Edge → Compute → Database). Bidirectional arrows (e.g., Multi-AZ replication) must show arrows on both ends. | Verify arrow direction matches the Terraform resource relationships and typical AWS data flow patterns. |
+   | I3 | Label readability | Labels must not overlap each other, must not be cut off by group boundaries, and must be readable at normal zoom. Multi-line labels should break cleanly between words. | Scan for any overlapping text, text extending beyond group borders, or illegibly small labels. |
+   | I4 | AZ symmetry | In Multi-AZ deployments, both Availability Zones should have mirrored layout structure (same resource types at similar vertical positions, similar sizing). | Compare the left AZ and right AZ side-by-side for structural symmetry. |
+
+   **Minor checks (fix if time permits):**
+
+   | # | Check | What to look for |
+   |---|-------|-----------------|
+   | M1 | Overall flow clarity | Primary traffic flow should be visually obvious (top-to-bottom or left-to-right) |
+   | M2 | Empty regions | Large empty spaces that could be compacted to improve readability |
+   | M3 | Arrow routing | Arrows should use clean orthogonal routes without unnecessary detours |
+
+4. **Report findings**: After analysis, produce a structured findings report:
+
+   ```
+   ## Visual Verification Report
+
+   ### Screenshot
+   - File: {screenshot_path}
+   - Rendering: OK / ERROR (describe error)
+
+   ### Critical Issues (must fix)
+   - [ ] C1: {description} — affected resources: {list}
+   - [ ] C2: {description} — overlapping icons: {icon_a} and {icon_b}
+   - [ ] C3: {description} — wrong label: "{actual}" should be "{expected}"
+   (or "None found" if all checks pass)
+
+   ### Important Issues (should fix)
+   - [ ] I1: {description}
+   (or "None found")
+
+   ### Minor Issues (optional)
+   - [ ] M1: {description}
+   (or "None found")
+   ```
+
+5. **Fix and re-verify**: For each issue found:
+
+   | Issue type | Fix approach |
+   |-----------|-------------|
+   | C1: Wrong/missing arrow | Add or correct `<mxCell>` edge elements — fix `source` and `target` attributes |
+   | C2: Icon overlap | Shift one icon's `<mxGeometry x="..." y="...">` by at least 80px horizontally or 60px vertically. If inside a group, also expand the group's width/height if needed. |
+   | C3: Label text error | Fix the `value` attribute of the affected `<mxCell>`. For line breaks, use `&lt;br&gt;` (HTML entity). |
+   | C4: Error dialog | Use the **HTML viewer fallback** (Step 2c) to bypass MCP URL data corruption. If the HTML fallback also fails, re-check the XML for syntax errors (unclosed tags, invalid characters). |
+   | I1: Group containment | Move the icon inside the correct parent group by adjusting its `<mxGeometry>` and ensuring the `parent` attribute references the correct group cell ID. |
+   | I2: Arrow direction | Swap `source` and `target` attributes, or add `startArrow`/`endArrow` to the edge style. |
+   | I3: Label readability | Adjust icon spacing, shorten labels, or expand group dimensions to give labels more room. |
+   | I4: AZ asymmetry | Mirror the x/y offsets of resources in AZ-1 to AZ-2 (adjust for the AZ group's x-offset). |
+
+   After applying fixes:
+   a. Re-write the `.drawio` file
+   b. Repeat from step 1 (re-take screenshot and re-verify)
+   c. Maximum **2 fix iterations**. If Critical issues remain after 2 iterations, present
+      the diagram with a warning listing the unresolved issues.
+
+6. **Skip conditions**: Skip this step if:
    - The diagram has fewer than 5 resources (simple diagrams rarely have layout issues)
    - The user explicitly requests to skip visual verification
-   - drawio MCP or Playwright MCP is not available
-
-**Example Playwright JavaScript for position extraction:**
-
-```javascript
-// Run via browser_evaluate
-(() => {
-  const cells = document.querySelectorAll('g[data-cell-id]');
-  return Array.from(cells).map(g => {
-    const rect = g.getBoundingClientRect();
-    return {
-      cellId: g.getAttribute('data-cell-id'),
-      x: Math.round(rect.x),
-      y: Math.round(rect.y),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height)
-    };
-  });
-})()
-```
+   - No Chrome/Chromium binary is found on the system
+   - Neither drawio MCP nor `node` is available (both screenshot methods require one of these)
 
 ### Step 6: Present to User
 
