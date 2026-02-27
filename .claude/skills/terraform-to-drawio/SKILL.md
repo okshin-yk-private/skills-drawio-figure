@@ -85,6 +85,7 @@ AWS Cloud
 - If a resource has `vpc_id` but no subnet → place inside VPC but outside any Subnet
 - If a resource has neither `vpc_id` nor `subnet_id` → place outside VPC (regional or global service)
 - Some resources like Lambda are conditionally VPC-based: only if `vpc_config` block is present
+- **Security service grouping**: After determining all arrows, check if security services (KMS, GuardDuty, Inspector, Secrets Manager, etc.) have zero arrows. If so, group them in a "Security & Compliance" dashed group at Region level. See `placement-rules.md` > "Security & Compliance Grouping" for details.
 - For resources where placement is ambiguous, consult the AWS public documentation.
   If MCP tools are available, use them to verify. If not, use web search to confirm.
 

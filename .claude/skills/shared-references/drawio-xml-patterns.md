@@ -152,6 +152,22 @@ never connect arrows to/from it.
 </mxCell>
 ```
 
+### Security & Compliance Group
+
+A dashed-border group for security services that do NOT have direct data flow arrows
+(e.g., KMS, GuardDuty, Inspector, Secrets Manager). Place at Region level, outside VPC.
+Services that DO have communication arrows (e.g., WAF attached to CloudFront/ALB) should
+NOT be placed in this group — they remain in their normal position in the data flow.
+
+```xml
+<!-- Security & Compliance group (for services without direct data flow arrows) -->
+<mxCell id="sec-group" value="Security &amp; Compliance"
+  style="fillColor=none;strokeColor=#DD344C;dashed=1;dashPattern=5 5;fontColor=#DD344C;fontStyle=1;fontSize=11;verticalAlign=top;align=left;spacingLeft=10;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;"
+  vertex="1" parent="region-1">
+  <mxGeometry x="..." y="..." width="..." height="..." as="geometry" />
+</mxCell>
+```
+
 ### Corporate Data Center Group
 
 ```xml
@@ -201,10 +217,15 @@ The key properties per category:
 
 ## Arrow Templates
 
+### Arrow Stroke Width Convention
+
+- **`strokeWidth=2`**: Primary data flow arrows (solid lines between services). Use for all standard, labeled, bidirectional, and exit/entry-constrained arrows.
+- **`strokeWidth=1`**: Secondary/optional flows (dashed arrows) and replication links. The thinner line creates visual hierarchy, making it clear these are not the primary data path.
+
 ### Standard Arrow (orthogonal, right-angle routing)
 
 ```xml
-<mxCell id="arrow-1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;strokeColor=#232F3E;strokeWidth=1;endArrow=block;endFill=1;fontSize=12;" edge="1" source="ec2-web" target="rds-main" parent="1">
+<mxCell id="arrow-1" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;strokeColor=#232F3E;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;" edge="1" source="ec2-web" target="rds-main" parent="1">
   <mxGeometry relative="1" as="geometry" />
 </mxCell>
 ```
@@ -212,7 +233,7 @@ The key properties per category:
 ### Arrow with Label
 
 ```xml
-<mxCell id="arrow-2" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;strokeColor=#232F3E;strokeWidth=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" source="alb-web" target="ec2-web" parent="1">
+<mxCell id="arrow-2" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;strokeColor=#232F3E;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" source="alb-web" target="ec2-web" parent="1">
   <mxGeometry relative="1" as="geometry" />
 </mxCell>
 ```
@@ -220,7 +241,7 @@ The key properties per category:
 ### Bidirectional Arrow
 
 ```xml
-<mxCell id="arrow-3" value="sync" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;strokeColor=#232F3E;strokeWidth=1;endArrow=block;endFill=1;startArrow=block;startFill=1;fontSize=11;" edge="1" source="rds-primary" target="rds-standby" parent="1">
+<mxCell id="arrow-3" value="sync" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;strokeColor=#232F3E;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;fontSize=11;" edge="1" source="rds-primary" target="rds-standby" parent="1">
   <mxGeometry relative="1" as="geometry" />
 </mxCell>
 ```
@@ -253,7 +274,7 @@ Public Subnet), add **exit/entry constraints** to the edge style to force the ro
 ```xml
 <!-- ALB → ECS Task: exit bottom, enter top → routes below Public Subnet -->
 <mxCell id="arrow-5" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;rounded=0;
-  strokeColor=#232F3E;strokeWidth=1;endArrow=block;endFill=1;fontSize=11;
+  strokeColor=#232F3E;strokeWidth=2;endArrow=block;endFill=1;fontSize=11;
   exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;"
   edge="1" source="alb" target="task-1a" parent="1">
   <mxGeometry relative="1" as="geometry" />

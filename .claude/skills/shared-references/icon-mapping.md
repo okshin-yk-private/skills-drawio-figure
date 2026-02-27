@@ -142,7 +142,7 @@ Each AWS service category has assigned colors for fillColor/gradientColor:
 | aws_security_group              | (use Security Group GROUP)           | Security group               |
 | aws_wafv2_web_acl               | resIcon=mxgraph.aws4.waf             | AWS WAF                      |
 | aws_shield_protection           | resIcon=mxgraph.aws4.shield          | AWS Shield                   |
-| aws_kms_key                     | resIcon=mxgraph.aws4.kms             | AWS KMS                      |
+| aws_kms_key                     | resIcon=mxgraph.aws4.key_management_service | AWS KMS               |
 | aws_secretsmanager_secret       | resIcon=mxgraph.aws4.secrets_manager | AWS Secrets Manager          |
 | aws_acm_certificate             | resIcon=mxgraph.aws4.certificate_manager | AWS Certificate Manager  |
 | aws_cognito_user_pool           | resIcon=mxgraph.aws4.cognito         | Amazon Cognito               |

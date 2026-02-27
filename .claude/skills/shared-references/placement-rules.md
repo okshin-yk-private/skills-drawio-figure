@@ -146,11 +146,50 @@ These are global AWS services that span all regions.
 | On-premises servers           | Use server icons outside AWS Cloud            |
 | DNS queries from users        | Arrow from Users → Route 53. Place Route 53 to the **side** of the primary flow chain, not between Users and the primary ingress target. |
 
+## Security & Compliance Grouping
+
+When security services (KMS, GuardDuty, Inspector, Secrets Manager, etc.) do **NOT** have direct
+communication arrows to other services in the diagram, group them in a **"Security & Compliance"**
+dashed group at the Region level. This visually separates them from the main data flow and
+improves readability.
+
+**Rule:** After determining all arrows in the diagram, check each security service:
+- If the service has **zero arrows** (neither source nor target of any edge) → place inside the Security & Compliance group
+- If the service **has arrows** (e.g., WAF attached to CloudFront/ALB, ACM providing certs) → place in its normal position in the data flow, NOT in the Security & Compliance group
+
+**Typical candidates for the group** (when they have no arrows):
+- `aws_kms_key` — AWS KMS
+- `aws_guardduty_detector` — Amazon GuardDuty
+- `aws_inspector2_enabler` — Amazon Inspector
+- `aws_secretsmanager_secret` — AWS Secrets Manager
+- `aws_config_configuration_recorder` — AWS Config
+- `aws_cloudtrail` — AWS CloudTrail
+
+**NOT candidates** (these typically have arrows):
+- `aws_wafv2_web_acl` — WAF (attached to CloudFront/ALB)
+- `aws_acm_certificate` — ACM (associated with load balancers/CloudFront)
+- `aws_cognito_user_pool` — Cognito (authentication flow arrows)
+
+See `group-hierarchy.md` > "Security & Compliance Group" for visual properties and
+`drawio-xml-patterns.md` > "Security & Compliance Group" for the XML template.
+
 ## Special Placement Notes
 
 ### Internet Gateway (IGW)
-Place on the VPC border (edge of VPC box), as it sits at the VPC boundary. Visually, position it
-at the top edge or left edge of the VPC group where external traffic enters.
+Place on the VPC border (edge of VPC box), as it sits at the VPC boundary.
+
+**Positioning rules:**
+- Place at the **top-center** of the VPC group, x-aligned with ALB (the primary ingress target)
+- In **Multi-AZ layouts**: position IGW in the gap between the two AZ groups, NOT inside or
+  overlapping any AZ boundary. The IGW should be above both AZs with clear vertical separation.
+- In **Overview layouts**: place at VPC top edge, centered horizontally
+
+**Arrow chain:** External traffic must flow through the IGW. Always create the arrow chain:
+`Users → IGW → ALB` (not `Users → ALB` directly). This accurately represents that internet
+traffic enters the VPC via the Internet Gateway before reaching the load balancer.
+
+**Vertical spacing:** Leave at least 30px between the IGW label bottom and the AZ group top
+to prevent label overlap. If needed, push AZ groups further down (increase AZ y-offset).
 
 ### NAT Gateway
 Place inside the **Public Subnet** where it is deployed (NAT gateways require a public subnet and EIP).

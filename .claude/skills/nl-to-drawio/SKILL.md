@@ -152,6 +152,7 @@ Since NL input doesn't have Terraform attributes (`vpc_id`, `subnet_id`), resolv
 | Service is regional (S3, DynamoDB, SQS, SNS, etc.) | Place inside Region, outside VPC |
 | Service is global (CloudFront, Route 53) | Place inside AWS Cloud, outside Region |
 | External elements (Users, Internet, On-premises) | Place outside AWS Cloud |
+| Security services with no arrows (KMS, GuardDuty, Inspector, Secrets Manager) | Group in "Security & Compliance" dashed group at Region level (see `placement-rules.md`) |
 
 **For Overview level:**
 - Place VPC-internal services inside a single VPC group (no subnet/AZ breakdown)

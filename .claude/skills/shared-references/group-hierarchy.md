@@ -22,6 +22,8 @@ AWS Cloud                    (outermost)
        │         │              └── Fargate tasks (icons)
        │         └── Auto Scaling group (may span AZs)
        │              └── EC2 instances
+       ├── Security & Compliance (dashed, for non-communicating security services)
+       │    └── KMS, GuardDuty, Inspector, Secrets Manager, etc.
        └── [Regional services outside VPC]
 ```
 
@@ -173,6 +175,32 @@ fillColor=none;strokeColor=#DD344C;dashed=0;fontColor=#DD344C;fontStyle=1;vertic
 ```
 shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_auto_scaling_group;strokeColor=#ED7100;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#ED7100;dashed=1;dashPattern=5 5;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;
 ```
+
+### Security & Compliance Group
+
+A dashed-border group for security services that do NOT have direct data flow arrows in the
+diagram (e.g., KMS, GuardDuty, Inspector, Secrets Manager). Place at Region level, outside VPC.
+This visually separates non-communicating security services from the main data flow, improving
+diagram readability.
+
+**Important:** Services with communication arrows (e.g., WAF attached to CloudFront/ALB) should
+NOT be in this group — they remain in their normal position in the data flow.
+
+| Property      | Value                          |
+|---------------|--------------------------------|
+| strokeColor   | #DD344C                        |
+| fillColor     | none                           |
+| dashPattern   | dashed                         |
+| grIcon        | (none — text label only)       |
+| fontColor     | #DD344C                        |
+
+**draw.io style:**
+```
+fillColor=none;strokeColor=#DD344C;dashed=1;dashPattern=5 5;fontColor=#DD344C;fontStyle=1;fontSize=11;verticalAlign=top;align=left;spacingLeft=10;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;
+```
+
+**Nesting:** Place inside Region group, outside VPC. Contains security service icons that have
+no arrows connecting them to other services in the diagram.
 
 ### ECS Service Group
 
