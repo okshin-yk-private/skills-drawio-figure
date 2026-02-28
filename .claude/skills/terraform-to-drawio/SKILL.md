@@ -13,10 +13,56 @@ standards-compliant `.drawio` XML file using official AWS Architecture Icons (mx
 
 ## Before You Begin
 
-1. Read `../shared-references/icon-mapping.md` — Terraform resource type → draw.io shape mapping
-2. Read `../shared-references/group-hierarchy.md` — Group nesting rules, colors, and draw.io XML patterns
-3. Read `../shared-references/placement-rules.md` — Which AWS resources belong inside which groups
-4. Read `../shared-references/drawio-xml-patterns.md` — XML templates for generating valid draw.io files
+Read the unified reference guideline (icon mapping, group hierarchy, placement rules, XML templates — all in one file):
+
+1. Read `../shared-references/unified-guideline.md`
+
+## HARD CONSTRAINTS: Placement Schema
+
+These constraints are **inviolable**. Every generated diagram MUST satisfy all rules below.
+Violations produce incorrect, misleading diagrams.
+
+### Placement Categories
+
+Every AWS element falls into exactly one category:
+
+| Category | parent Group | Examples |
+|----------|-------------|----------|
+| EXTERNAL | `parent="1"` (canvas root) | Users, Internet, On-premises, Corporate DC |
+| GLOBAL | AWS Cloud group | CloudFront, Route 53, Global Accelerator, WAF (CLOUDFRONT scope) |
+| REGIONAL | Region group | S3, DynamoDB, SQS, SNS, API Gateway, Lambda (no vpc_config), EventBridge, Step Functions, CloudWatch, KMS, Secrets Manager, Cognito, ECR, Kinesis, Glue, Athena |
+| VPC_INTERNAL | VPC or Subnet group | EC2, RDS, ALB/NLB, NAT GW, IGW, ElastiCache, ECS Service (with network_config) |
+| CONDITIONAL | Depends on TF config | Lambda (`vpc_config` → VPC, else Region), ECS Fargate (`network_configuration` → VPC, else Region), OpenSearch (`vpc_options` → VPC, else Region) |
+
+### Required Nesting Rules
+
+These `parent` attribute assignments are **mandatory**:
+
+| Element | parent MUST be | NEVER parent of |
+|---------|---------------|-----------------|
+| Region | AWS Cloud group | canvas root (`"1"`) |
+| VPC | Region group | AWS Cloud, canvas root |
+| Availability Zone | VPC group | Region, AWS Cloud |
+| Public Subnet | AZ group | Region, AWS Cloud |
+| Private Subnet | AZ group | Region, AWS Cloud |
+| Security Group | Subnet group | VPC directly, Region |
+| ECS Service group | Private Subnet | VPC directly, AZ directly, Region |
+| ECS Task icon | ECS Service group | Subnet directly, VPC directly |
+| NAT Gateway | Public Subnet | VPC directly, Private Subnet |
+| IGW | VPC group (at border) | Region, Subnet |
+| ALB (multi-AZ) | VPC group | Individual Subnet (when spanning AZs) |
+| RDS (in subnet) | Private Subnet | VPC directly (unless no subnet info) |
+| EC2 | Subnet (public or private) | VPC directly (unless no subnet info) |
+| Security & Compliance group | Region group | VPC, AWS Cloud |
+
+### Validation Checklist
+
+Before outputting XML, verify **every** `<mxCell>`:
+
+1. **Parent chain validity**: For each cell, trace `parent` → `parent` → ... → `"1"`. The chain must follow: Element → Subnet → AZ → VPC → Region → AWS Cloud → canvas root. No level may be skipped.
+2. **No orphaned resources**: Every service icon must have a `parent` that is a valid group cell ID (not `"1"` unless the element is EXTERNAL or the AWS Cloud group itself).
+3. **Category compliance**: Cross-reference each element against the Placement Categories table. If REGIONAL, `parent` must be the Region group ID. If VPC_INTERNAL, `parent` must be a VPC or Subnet group ID.
+4. **No sibling placement errors**: Resources that should be nested inside a group must not be placed as siblings of that group. Example: ECS Task parent must be ECS Service group, NOT the same parent as the ECS Service group.
 
 ## Workflow
 
@@ -41,7 +87,7 @@ Build an internal dependency graph:
     {
       "tf_type": "aws_instance",
       "tf_name": "web",
-      "drawio_shape": "mxgraph.aws4.ec2",       // from icon-mapping.md
+      "drawio_shape": "mxgraph.aws4.ec2",       // from unified-guideline.md > "Icon Mapping"
       "label": "Amazon EC2\nweb",
       "placement": {
         "region": "ap-northeast-1",              // from provider or resource
@@ -79,13 +125,13 @@ AWS Cloud
        └── [VPC-external regional services: S3, DynamoDB, CloudFront, Route 53, etc.]
 ```
 
-**Decision rules for placement — consult `../shared-references/placement-rules.md` for the full list:**
+**Decision rules for placement — consult `../shared-references/unified-guideline.md` > "Placement Rules" and the HARD CONSTRAINTS section above for the full list:**
 
 - If a resource has `subnet_id` or `subnet_ids` → place inside the corresponding Subnet group
 - If a resource has `vpc_id` but no subnet → place inside VPC but outside any Subnet
 - If a resource has neither `vpc_id` nor `subnet_id` → place outside VPC (regional or global service)
 - Some resources like Lambda are conditionally VPC-based: only if `vpc_config` block is present
-- **Security service grouping**: After determining all arrows, check if security services (KMS, GuardDuty, Inspector, Secrets Manager, etc.) have zero arrows. If so, group them in a "Security & Compliance" dashed group at Region level. See `placement-rules.md` > "Security & Compliance Grouping" for details.
+- **Security service grouping**: After determining all arrows, check if security services (KMS, GuardDuty, Inspector, Secrets Manager, etc.) have zero arrows. If so, group them in a "Security & Compliance" dashed group at Region level. See `unified-guideline.md` > "Placement Rules" > "Security & Compliance Grouping" for details.
 - For resources where placement is ambiguous, consult the AWS public documentation.
   If MCP tools are available, use them to verify. If not, use web search to confirm.
 
@@ -186,7 +232,7 @@ After all icons are placed, run a validation pass:
 
 ### Step 4: Generate Draw.io XML
 
-Use the templates in `../shared-references/drawio-xml-patterns.md` to assemble the XML.
+Use the templates in `../shared-references/unified-guideline.md` > "XML Templates" to assemble the XML.
 
 **Key principles:**
 
@@ -197,6 +243,7 @@ Use the templates in `../shared-references/drawio-xml-patterns.md` to assemble t
 - Arrows use `edgeStyle=orthogonalEdgeStyle` for right-angle lines (per AWS guideline)
 - Labels: 12px Arial, service names on max 2 lines
 - Use short forms only after full name appears once in the diagram
+- **Z-order**: VPC-level icons (ALB, IGW) that visually overlap with AZ/Subnet groups MUST appear AFTER all AZ/Subnet group cells and their descendants in the XML (see Key XML Rules #8 in unified-guideline.md)
 
 **File structure:**
 
@@ -388,7 +435,7 @@ directly to the Chromium engine without JavaScript URL normalization.
    |---|-------|-----------------|---------------|
    | I1 | Group containment | Every resource icon must be visually inside its correct parent group. E.g., EC2 instances inside their Subnet, Subnets inside their AZ, AZs inside VPC. Resources that should be outside VPC (S3, CloudFront, SNS, etc.) must not appear inside VPC. | Compare the visual position of each icon against the group hierarchy defined in Step 2 (placement rules). |
    | I2 | Arrow direction | Arrows must flow in the correct direction reflecting data/request flow (typically top-to-bottom: Users → Edge → Compute → Database). Bidirectional arrows (e.g., Multi-AZ replication) must show arrows on both ends. | Verify arrow direction matches the Terraform resource relationships and typical AWS data flow patterns. |
-   | I3 | Label readability | Labels must not overlap each other, must not be cut off by group boundaries, and must be readable at normal zoom. Multi-line labels should break cleanly between words. | Scan for any overlapping text, text extending beyond group borders, or illegibly small labels. |
+   | I3 | Label readability | Labels must not overlap each other, must not be cut off by group boundaries, and must be readable at normal zoom. Multi-line labels should break cleanly between words. Check that VPC-level icons (ALB, IGW) are not obscured by AZ/Subnet group fills — this indicates a z-order issue (Key XML Rules #8). | Scan for any overlapping text, text extending beyond group borders, illegibly small labels, or labels hidden behind colored group backgrounds. |
    | I4 | AZ symmetry | In Multi-AZ deployments, both Availability Zones should have mirrored layout structure (same resource types at similar vertical positions, similar sizing). | Compare the left AZ and right AZ side-by-side for structural symmetry. |
 
    **Minor checks (fix if time permits):**
@@ -433,7 +480,7 @@ directly to the Chromium engine without JavaScript URL normalization.
    | C4: Error dialog | Use the **HTML viewer fallback** (Step 2c) to bypass MCP URL data corruption. If the HTML fallback also fails, re-check the XML for syntax errors (unclosed tags, invalid characters). |
    | I1: Group containment | Move the icon inside the correct parent group by adjusting its `<mxGeometry>` and ensuring the `parent` attribute references the correct group cell ID. |
    | I2: Arrow direction | Swap `source` and `target` attributes, or add `startArrow`/`endArrow` to the edge style. |
-   | I3: Label readability | Adjust icon spacing, shorten labels, or expand group dimensions to give labels more room. |
+   | I3: Label readability | Adjust icon spacing, shorten labels, or expand group dimensions to give labels more room. If a VPC-level icon's label is hidden behind a group fill, move the icon's mxCell AFTER all AZ/Subnet group subtrees in the XML (z-order fix). |
    | I4: AZ asymmetry | Mirror the x/y offsets of resources in AZ-1 to AZ-2 (adjust for the AZ group's x-offset). |
 
    After applying fixes:
@@ -464,7 +511,7 @@ Use `present_files` to share the `.drawio` file. Provide a brief summary:
 - Break service name labels after the second word if necessary
 - Use short forms (e.g., "Amazon EC2") after full name mentioned once
 - Order callout numbers linearly: left→right, top→bottom, or clockwise
-- Use the correct group border colors and dash patterns (see group-hierarchy.md)
+- Use the correct group border colors and dash patterns (see unified-guideline.md > "Group Hierarchy & Styles")
 
 ### DON'T
 - Crop, flip, rotate, or reshape icons
