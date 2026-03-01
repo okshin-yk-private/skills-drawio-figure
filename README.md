@@ -2,6 +2,46 @@
 
 自然言語またはTerraformコードからAWS構成図（`.drawio`）を自動生成するClaude Codeスキル集。
 
+## インストール
+
+任意のプロジェクトにワンコマンドでインストールできます。
+
+```bash
+# プロジェクトレベル（カレントディレクトリの .claude/ に導入）
+bash <(curl -fsSL https://raw.githubusercontent.com/okshin-yk-private/skills-drawio-figure/main/install.sh)
+
+# ユーザーレベル（~/.claude/ に導入、全プロジェクトで利用可能）
+bash <(curl -fsSL https://raw.githubusercontent.com/okshin-yk-private/skills-drawio-figure/main/install.sh) --user
+
+# dry-run で変更内容をプレビュー
+bash <(curl -fsSL https://raw.githubusercontent.com/okshin-yk-private/skills-drawio-figure/main/install.sh) --dry-run
+```
+
+プライベートリポジトリの場合は `--token` オプションで GitHub PAT を指定してください。
+
+```bash
+bash install.sh --token ghp_xxxx
+```
+
+### アンインストール
+
+```bash
+bash install.sh --uninstall
+```
+
+### オプション一覧
+
+| オプション | 説明 |
+|---|---|
+| `--user` | ユーザーレベル (`~/.claude/`) にインストール |
+| `--skip-mcp` | MCP サーバー設定 (`.mcp.json`) の更新をスキップ |
+| `--skip-settings` | settings.json の更新をスキップ |
+| `--repo URL` | リポジトリURL を指定 |
+| `--branch BRANCH` | ブランチ名を指定 (デフォルト: `main`) |
+| `--token TOKEN` | GitHub Personal Access Token |
+| `--uninstall` | インストールしたファイルと設定を削除 |
+| `--dry-run` | 実際の変更を行わず実行内容を表示 |
+
 ## Skills
 
 | Skill | 入力 | 説明 |
@@ -25,6 +65,7 @@
     SKILL.md                         # スキル定義
   shared-references/
     unified-guideline.md             # 共通リファレンス（アイコン・配置・XMLテンプレート）
+install.sh                           # インストールスクリプト
 ```
 
 ## MCP Servers
